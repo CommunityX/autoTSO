@@ -2192,6 +2192,7 @@ const aUI = {
                 aSession.adventure.id = event.target.name;
                 aUI.Alert(loca.GetText('ADN', adventure.name) + " is selected", adventure.name);
                 aSession.isOn.Adventure = true;
+                aSession.adventure.paused = false;
                 aUI.modals.adventure.AM_LoadInfo();
                 aUI.menu.SelectedAdventure = event.target.name;
                 aUI.menu.init();
@@ -2986,9 +2987,27 @@ const aUI = {
                         ]);
                         aUI.modals.adventure.TM_UpdateTemplateAttacks(step.data);
                         break;
+                    case 'UnloadGenerals':
+                        selectedStep.append([
+                            aUtils.create.Row([
+                                [11, "Skip for moving generals"],
+                                [1, createSwitch('skip_moving_generals', step.skipMovingGeneral || false)],
+                            ]),
+                        ]);
+                        break;
+                    case 'Pause':
+                        selectedStep.append([
+                            aUtils.create.Row([
+                                [11, "Play a sound when pausing!"],
+                                [1, createSwitch('play_sound', step.playSound || false)],
+                            ]),
+                        ]);
+                        break;
                 }
                 $("#skip_production").change(function () { step.skip = $(this).is(":checked"); });
                 $("#kill_all_enemies").change(function () { step.killAll = $(this).is(":checked"); });
+                $("#play_sound").change(function () { step.playSound = $(this).is(":checked"); });
+                $("#skip_moving_generals").change(function () { step.skipMovingGeneral = $(this).is(":checked"); });
             },
             TM_SaveTemplate: function () {
                 const LHTemp = aWindow.withsBody('#LHTemp').text();
@@ -3126,6 +3145,8 @@ const aUI = {
                             $('<li>').html($('<a>', { 'href': '#', 'name': 'VisitAdventure' }).text("Load Adventure")),
                             $('<li>').html($('<a>', { 'href': '#', 'name': 'CollectPickups', 'class': 'venture_only' }).text("Collect Pickups")),
                             $('<li>').html($('<a>', { 'href': '#', 'name': 'AdventureTemplate' }).text("Adventure Template/s")),
+                            $('<li>').html($('<a>', { 'href': '#', 'name': 'UnloadGenerals' }).text("Unload General/s")),
+                            $('<li>').html($('<a>', { 'href': '#', 'name': 'Pause' }).text("Pause")),
                         ])
                     ])
                 )
@@ -3266,7 +3287,7 @@ const aUI = {
                     $("#aAdventureAmount").html(buffAmount);
                     $("#aAdventureRepeats").html(aSession.adventure.repeatCount);
                     $("#aAdventureFile").html("Saved Locally!!");
-                    $("#aAdventureToggle").prop("disabled", buffAmount === 0);
+                    //$("#aAdventureToggle").prop("disabled", buffAmount === 0);
                     $('#aAdventureTotalGenerals').text(aSession.adventure.getGenerals().length);
                     $('#aAdventureTotalEnemies').text(aSession.adventure.getEnemies().all);
                     aUI.modals.adventure.AM_UpdateInfo();
@@ -7181,6 +7202,9 @@ const aAdventure = {
                         return aAdventure.auto.result("Waiting for troops at star before applying speed buff", false, 2);
                     }
 
+                    aDebug.log('adventure', 'UseSpeedBuff: Resync with server');
+                    menuZoneRefreshHandler()
+
                     const speedBuff = aSession.adventure.currentStep().data || aSettings.defaults.Adventures.speedBuff;
                     aDebug.log('adventure', 'UseSpeedBuff: Target buff:', speedBuff);
 
@@ -7267,7 +7291,7 @@ const aAdventure = {
                     aDebug.log('adventure', 'UnloadGenerals: Found', allSpecialists.length, 'total,', arrivedSpecialists.length, 'arrived,', travelingSpecialists.length, 'traveling');
 
                     // Wait for expected generals to arrive AND be idle (not traveling)
-                    if (expectedGenerals.length > 0) {
+                    if (expectedGenerals.length > 0 && !step.skipMovingGeneral) {
                         // Still waiting for some to appear on the zone
                         if (allSpecialists.length < expectedGenerals.length) {
                             aSession.adventure.unloadGenerals.allArrivedTime = null;
@@ -7289,22 +7313,24 @@ const aAdventure = {
                         return aAdventure.auto.result("No specialists found", true);
                     }
 
-                    // All expected specialists have arrived - track the arrival time
-                    if (!aSession.adventure.unloadGenerals.allArrivedTime) {
-                        aSession.adventure.unloadGenerals.allArrivedTime = Date.now();
-                        aDebug.log('adventure', 'UnloadGenerals: All specialists arrived, starting settle timer');
-                    }
+                    if (!step.skipMovingGeneral) {
+                        // All expected specialists have arrived - track the arrival time
+                        if (!aSession.adventure.unloadGenerals.allArrivedTime) {
+                            aSession.adventure.unloadGenerals.allArrivedTime = Date.now();
+                            aDebug.log('adventure', 'UnloadGenerals: All specialists arrived, starting settle timer');
+                        }
 
-                    // Calculate elapsed time since all arrived
-                    var elapsedSeconds = Math.floor((Date.now() - aSession.adventure.unloadGenerals.allArrivedTime) / 1000);
-                    var remainingSettle = UNLOAD_GENERALS_SETTLE_SECONDS - elapsedSeconds;
+                        // Calculate elapsed time since all arrived
+                        var elapsedSeconds = Math.floor((Date.now() - aSession.adventure.unloadGenerals.allArrivedTime) / 1000);
+                        var remainingSettle = UNLOAD_GENERALS_SETTLE_SECONDS - elapsedSeconds;
 
-                    aDebug.log('adventure', 'UnloadGenerals: Settle time - elapsed:', elapsedSeconds, 's, remaining:', Math.max(0, remainingSettle), 's');
+                        aDebug.log('adventure', 'UnloadGenerals: Settle time - elapsed:', elapsedSeconds, 's, remaining:', Math.max(0, remainingSettle), 's');
 
-                    // Wait for settle time before unloading
-                    if (remainingSettle > 0) {
-                        aDebug.log('adventure', 'UnloadGenerals: Waiting for settle time');
-                        return aAdventure.auto.result("Waiting for specialists to settle ({0}s)".format(remainingSettle), false, 2);
+                        // Wait for settle time before unloading
+                        if (remainingSettle > 0) {
+                            aDebug.log('adventure', 'UnloadGenerals: Waiting for settle time');
+                            return aAdventure.auto.result("Waiting for specialists to settle ({0}s)".format(remainingSettle), false, 2);
+                        }
                     }
 
                     // Unload all troops from all generals
@@ -7717,6 +7743,29 @@ const aAdventure = {
                     return aAdventure.auto.result();
                 } catch (err) {
                     aDebug.error('adventure', 'LoadGeneralsToEnd: Error:', err);
+                    console.error(err);
+                }
+            },
+            Pause: function () {
+                try {
+                    const step = aSession.adventure.currentStep();
+                    if (aSession.adventure.paused) {
+                        if (aSession.isOn.Adventure) {
+                            aDebug.log('adventure', 'Pause: Resuming');
+                            return aAdventure.auto.result("Resuming from pause", true, 3);
+                        }
+                    } else {
+                        aDebug.log('adventure', 'Pause: pausing step execution. Click start to resume');
+                        aSession.adventure.paused = true;
+                        aSession.isOn.Adventure = false;
+                        $("#aAdventureToggle").data("cmd", aSession.isOn.Adventure ? 'stop' : 'start').text(aSession.isOn.Adventure ? 'Stop' : 'Start');
+
+                        if (step.playSound) {
+                            aUI.playSound('QuestComplete');
+                        }
+                    }
+                } catch (err) {
+                    aDebug.error('adventure', 'Pause: Error:', err);
                     console.error(err);
                 }
             }
