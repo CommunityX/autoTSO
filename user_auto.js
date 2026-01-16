@@ -6239,26 +6239,26 @@ const aAdventure = {
                 }
 
                 // Check if any general still has units assigned - unload all before loading new wave
-                aDebug.log('adventure', 'attemptLoad: Checking if any generals have units assigned');
-                var generalsWithUnits = aSpecialists.getSpecialists(SPECIALIST_TYPE.GENNERAL).filter(function(g) {
-                    var army = g.GetArmy();
-                    var hasUnits = army && army.GetUnitsCount() > 0;
-                    if (hasUnits) {
-                        var name = g.GetName ? g.GetName() : 'Unknown';
-                        aDebug.log('adventure', 'attemptLoad: General', name, 'has', army.GetUnitsCount(), 'units');
-                    }
-                    return hasUnits;
-                });
+                //aDebug.log('adventure', 'attemptLoad: Checking if any generals have units assigned');
+                //var generalsWithUnits = aSpecialists.getSpecialists(SPECIALIST_TYPE.GENNERAL).filter(function(g) {
+                //    var army = g.GetArmy();
+                //    var hasUnits = army && army.GetUnitsCount() > 0;
+                //    if (hasUnits) {
+                //        var name = g.GetName ? g.GetName() : 'Unknown';
+                //        aDebug.log('adventure', 'attemptLoad: General', name, 'has', army.GetUnitsCount(), 'units');
+                //    }
+                //    return hasUnits;
+                //});
 
-                aDebug.log('adventure', 'attemptLoad: Found', generalsWithUnits.length, 'generals with units assigned');
+                //aDebug.log('adventure', 'attemptLoad: Found', generalsWithUnits.length, 'generals with units assigned');
 
-                if (generalsWithUnits.length > 0) {
-                    aDebug.log('adventure', 'attemptLoad: Unloading all generals before loading new wave');
-                    shortcutsFreeAllUnits();
-                    return aAdventure.auto.result("Unloading units from all generals", false, 1);
-                }
+                //if (generalsWithUnits.length > 0) {
+                //    aDebug.log('adventure', 'attemptLoad: Unloading all generals before loading new wave');
+                //    shortcutsFreeAllUnits();
+                //   return aAdventure.auto.result("Unloading units from all generals", false, 1);
+                //}
 
-                aDebug.log('adventure', 'attemptLoad: All generals are empty, proceeding to load');
+                //aDebug.log('adventure', 'attemptLoad: All generals are empty, proceeding to load');
 
                 if (state.army.canSubmit) {
                     aDebug.log('adventure', 'attemptLoad: Army available, loading generals');
@@ -7289,6 +7289,8 @@ const aAdventure = {
                     }
 
                     aDebug.log('adventure', 'UnloadGenerals: Found', allSpecialists.length, 'total,', arrivedSpecialists.length, 'arrived,', travelingSpecialists.length, 'traveling');
+
+                    const step = aSession.adventure.currentStep();
 
                     // Wait for expected generals to arrive AND be idle (not traveling)
                     if (expectedGenerals.length > 0 && !step.skipMovingGeneral) {
