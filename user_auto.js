@@ -7891,6 +7891,7 @@ const aAdventure = {
                             }
                             aQueue.add('sendGeneralsHome', { id: id, num: index + 1, total: generals.length });
                         });
+                        aSession.adventure.action = "";
                         return aAdventure.auto.result('All general sent', true, 3);
                     }
                 } catch (err) {
