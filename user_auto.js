@@ -992,6 +992,20 @@ const aQueue = {
                 ),
                 'Adventure');
         },
+        sendGeneralsHome: function (args) {
+            var homeID = game.gi.mCurrentPlayer.GetHomeZoneId()
+
+            aDebug.log('adventure', 'sendGeneralsHome: Sending general', args.id, '(', args.num, '/', args.total, ') home', homeID);
+            armyServices.specialist.sendToZone(
+                armyGetSpecialistFromID(args.id),
+                homeID
+            );
+            aUI.updateStatus(
+                'Sending generals home ({0}/{1})'.format(
+                    args.num,
+                    args.total
+                ));
+        },
         travelToZone: function (destination) {
             const to = {
                 "Adventure": aAdventure.info.getActiveAdvetureID(),
@@ -1548,7 +1562,6 @@ const aUtils = {
                 }
                 return true;
             } catch (e) {
-                console.error('Path validation error: ' + e);
                 console.error('Path validation error: ' + e);
                 return false;
             }
@@ -2987,6 +3000,32 @@ const aUI = {
                         ]);
                         aUI.modals.adventure.TM_UpdateTemplateAttacks(step.data);
                         break;
+                    case 'SendHome':
+                        selectedStep.append([
+                            aUtils.create.Row([[12, 'This is a saved version of the data (Update if needed)']]),
+                            aUtils.create.Row([
+                                [3, "Template file: "],
+                                [7, aUtils.create.Span('selectedStep_TemplateFile', step.file)],
+                                [2, aUtils.create.Button("", "Update").click(function () {
+                                    const data = aUtils.file.Read(step.file);
+                                    aUI.modals.adventure.TM_UpdateStepStatus(data, data ? "Updated" : "Failed");
+                                    if (!data) return;
+                                    step.data = data;
+                                    aUI.modals.adventure.TM_UpdateTemplateAttacks(data);
+                                })]
+                            ]),
+                            $('<br>'),
+                            createTableRow([
+                                [5, "General"],
+                                [4, "Army"],
+                                [1, "Move"],
+                                [1, "Attack"],
+                                [1, "Delay"]
+                            ], true),
+                            aUtils.create.Span('selectedStep_TemplateAttacks').addClass('small')
+                        ]);
+                        aUI.modals.adventure.TM_UpdateTemplateAttacks(step.data);
+                        break;
                     case 'UnloadGenerals':
                         selectedStep.append([
                             aUtils.create.Row([
@@ -3146,6 +3185,7 @@ const aUI = {
                             $('<li>').html($('<a>', { 'href': '#', 'name': 'CollectPickups', 'class': 'venture_only' }).text("Collect Pickups")),
                             $('<li>').html($('<a>', { 'href': '#', 'name': 'AdventureTemplate' }).text("Adventure Template/s")),
                             $('<li>').html($('<a>', { 'href': '#', 'name': 'UnloadGenerals' }).text("Unload General/s")),
+                            $('<li>').html($('<a>', { 'href': '#', 'name': 'SendHome' }).text("Send General/s Home")),
                             $('<li>').html($('<a>', { 'href': '#', 'name': 'Pause' }).text("Pause")),
                         ])
                     ])
@@ -3162,6 +3202,21 @@ const aUI = {
                                 const data = aUtils.file.Read(file.nativePath);
                                 if (!data) return alert('Invalid file');
                                 aWindow.steps.push({ name: 'AdventureTemplate', file: file.nativePath, data: data });
+                            });
+                            aUI.modals.adventure.TM_UpdateView();
+                        };
+                        root.addEventListener(window.runtime.flash.events.FileListEvent.SELECT_MULTIPLE, selectHandler);
+                    } else if (this.name === 'SendHome') {
+                        var txtFilter = new air.FileFilter("Template", "*.*");
+                        var root = new air.File();
+                        root.browseForOpenMultiple("Open", new window.runtime.Array(txtFilter));
+                        // Use self-removing handler to prevent memory leak
+                        var selectHandler = function (event) {
+                            root.removeEventListener(window.runtime.flash.events.FileListEvent.SELECT_MULTIPLE, selectHandler);
+                            event.files.forEach(function (file) {
+                                const data = aUtils.file.Read(file.nativePath);
+                                if (!data) return alert('Invalid file');
+                                aWindow.steps.push({ name: 'SendHome', file: file.nativePath, data: data });
                             });
                             aUI.modals.adventure.TM_UpdateView();
                         };
@@ -3331,7 +3386,7 @@ const aUI = {
                         var details = "";
 
                         // For AdventureTemplate, show filename from step.file
-                        if (step.name === 'AdventureTemplate' && step.file) {
+                        if (['AdventureTemplate', 'SendHome'].indexOf(step.name) >= 0 && step.file) {
                             details = step.file.split('\\').pop().split('/').pop();
                         } else if (step.data) {
                             if (typeof step.data === 'object') {
@@ -6239,26 +6294,26 @@ const aAdventure = {
                 }
 
                 // Check if any general still has units assigned - unload all before loading new wave
-                //aDebug.log('adventure', 'attemptLoad: Checking if any generals have units assigned');
-                //var generalsWithUnits = aSpecialists.getSpecialists(SPECIALIST_TYPE.GENNERAL).filter(function(g) {
-                //    var army = g.GetArmy();
-                //    var hasUnits = army && army.GetUnitsCount() > 0;
-                //    if (hasUnits) {
-                //        var name = g.GetName ? g.GetName() : 'Unknown';
-                //        aDebug.log('adventure', 'attemptLoad: General', name, 'has', army.GetUnitsCount(), 'units');
-                //    }
-                //    return hasUnits;
-                //});
+                aDebug.log('adventure', 'attemptLoad: Checking if any generals have units assigned');
+                var generalsWithUnits = aSpecialists.getSpecialists(SPECIALIST_TYPE.GENNERAL).filter(function(g) {
+                    var army = g.GetArmy();
+                    var hasUnits = g.GetGarrisonGridIdx() > 0 && g.HasUnits() && !g.IsInUse() && !g.isTravellingAway();
+                    if (hasUnits) {
+                        var name = g.GetName ? g.GetName() : 'Unknown';
+                        aDebug.log('adventure', 'attemptLoad: General', name, 'has', army.GetUnitsCount(), 'units');
+                    }
+                    return hasUnits;
+                });
 
-                //aDebug.log('adventure', 'attemptLoad: Found', generalsWithUnits.length, 'generals with units assigned');
+                aDebug.log('adventure', 'attemptLoad: Found', generalsWithUnits.length, 'generals with units assigned');
 
-                //if (generalsWithUnits.length > 0) {
-                //    aDebug.log('adventure', 'attemptLoad: Unloading all generals before loading new wave');
-                //    shortcutsFreeAllUnits();
-                //   return aAdventure.auto.result("Unloading units from all generals", false, 1);
-                //}
+                if (generalsWithUnits.length > 0) {
+                    aDebug.log('adventure', 'attemptLoad: Unloading all generals before loading new wave');
+                    shortcutsFreeAllUnits();
+                   return aAdventure.auto.result("Unloading units from all generals", false, 1);
+                }
 
-                //aDebug.log('adventure', 'attemptLoad: All generals are empty, proceeding to load');
+                aDebug.log('adventure', 'attemptLoad: All generals are empty, proceeding to load');
 
                 if (state.army.canSubmit) {
                     aDebug.log('adventure', 'attemptLoad: Army available, loading generals');
@@ -7134,7 +7189,15 @@ const aAdventure = {
                         return aAdventure.auto.result("All Units are loaded!!", true, 2);
                     }
 
+                    if (!aSession.adventure.action) {
+                        aSession.adventure.action = "load";
+                        aDebug.log('adventure', 'InHomeLoadGenerals: Unloading all generals before loading');
+                        shortcutsFreeAllUnits();
+                        return aAdventure.auto.result("Unloading units from all generals", false, 1);
+                    }
+
                     aDebug.log('adventure', 'InHomeLoadGenerals: Attempting to load units');
+                    aSession.adventure.action = '';
                     return aAdventure.battle.attemptLoad(state, false);
                 } catch (er) { console.error(er) }
             },
@@ -7753,6 +7816,7 @@ const aAdventure = {
                     const step = aSession.adventure.currentStep();
                     if (aSession.adventure.paused) {
                         if (aSession.isOn.Adventure) {
+                            aSession.adventure.paused = false
                             aDebug.log('adventure', 'Pause: Resuming');
                             return aAdventure.auto.result("Resuming from pause", true, 3);
                         }
@@ -7768,6 +7832,69 @@ const aAdventure = {
                     }
                 } catch (err) {
                     aDebug.error('adventure', 'Pause: Error:', err);
+                    console.error(err);
+                }
+            },
+            SendHome: function() {
+                try {
+                    if (!aAdventure.info.isOnAdventure()) {
+                        aDebug.log('adventure', 'SendHome: NOT on adventure island');
+                        return aAdventure.auto.result("You must be on adventure island!");
+                    }
+
+                    aAdventure.army.updateArmy();
+                    const step = aSession.adventure.currentStep();
+                    battlePacket = battleLoadDataCheck(step.data);
+                    const allState = aAdventure.battle.getState();
+
+                    var fileName = step.file ? step.file.split('\\').pop().split('/').pop() : 'Template';
+                    aDebug.log('adventure', 'SendHome: Processing', fileName);
+
+                    const generals = aSession.adventure.getGenerals(aSession.adventure.index);
+                    aDebug.log('adventure', 'SendHome: Found', generals.length, 'generals to send');
+
+                    if (!generals.length) {
+                        aDebug.log('adventure', 'SendHome: No generals to send');
+                        return aAdventure.auto.result("Can't send generals");
+                    }
+
+                    if (aAdventure.info.areGeneralsBusy(generals)) {
+                        aDebug.log('adventure', 'SendHome: Generals are busy, waiting');
+                        return aAdventure.auto.result(null);
+                    }
+
+                    if (!aSession.adventure.action) {
+                        aSession.adventure.action = "load";
+                        aDebug.log('adventure', 'SendHome: Initializing action state to MOVE');
+                    }
+
+                    if (aSession.adventure.action === "load") {
+                        aDebug.log('adventure', 'SendHome: LOAD phase - army matched:', allState.army.matched);
+                        if (!allState.army.matched) {
+                            aDebug.log('adventure', 'SendHome: Attempting load operations');
+                            return aAdventure.battle.attemptLoad(allState, false);
+                        }
+                        aDebug.log('adventure', 'SendHome: LOAD complete, transitioning to TRAVEL');
+                        aSession.adventure.action = "travel";
+                    }
+
+                    if (aSession.adventure.action === "travel") {
+                        aDebug.log('adventure', 'SendHome: Queuing', generals.length, 'generals for travel');
+
+                        generals.forEach(function (id, index) {
+                            try {
+                                var gen = armyGetSpecialistFromID(id);
+                                var genName = gen && gen.getName ? gen.getName(false) : id;
+                                aDebug.log('adventure', 'SendHome: Queuing general', index + 1, '/', generals.length, '-', genName);
+                            } catch (e) {
+                                aDebug.log('adventure', 'SendHome: Queuing general', index + 1, '/', generals.length, '-', id);
+                            }
+                            aQueue.add('sendGeneralsHome', { id: id, num: index + 1, total: generals.length });
+                        });
+                        return aAdventure.auto.result('All general sent', true, 3);
+                    }
+                } catch (err) {
+                    aDebug.error('adventure', 'SendHome: Error:', err);
                     console.error(err);
                 }
             }
