@@ -3058,8 +3058,10 @@ const aUI = {
                         { name: 'InHomeLoadGenerals', file: LHTemp, data: aUtils.file.Read(LHTemp) },
                         { name: 'StartAdventure' },
                         { name: 'SendGeneralsToAdventure' }
-                    ].concat(aWindow.steps)
+                    ].concat(aWindow.steps),
+                    invited: $('#LHAdventureInvited').is(":checked")
                 }
+                aDebug.log('adventure', 'TM_SaveTemplate', template);
                 template.steps.push({ name: 'LoadGeneralsToEnd' });
                 template.hash = hash(JSON.stringify(template));
                 var id = aWindow.adventureIndex ?
@@ -3096,7 +3098,7 @@ const aUI = {
                 var adventureSelect = function () {
                     const select = aUtils.create.Select('aTemplate_AdventureSelect');
                     $.each(aAdventure.data.getAdventures(), function (category, adventures) {
-                        if (['Scenario', 'Coop'].indexOf(category) !== -1) return;
+                        if (['Scenario'].indexOf(category) !== -1) return;
                         var optGroup = $('<optgroup>', { label: category });
                         $.each(adventures, function (i, adv) {
                             const disabled = aAdventure.data.getAdventureType(adv) === "Venture" && !aAdventure.data.getItems(adv) ? true : false;
@@ -3119,6 +3121,7 @@ const aUI = {
                                 [7, aUtils.create.Span('LHTemp')],
                                 [2, aUtils.create.Button("LHTempSelect", "Select")]
                             ]),
+                            aUtils.create.Row([[3, 'Invited'], [2, createSwitch('LHAdventureInvited', false)]]),
                         ])
                     ]], 'main'),
                     $('<br>'),
@@ -3239,6 +3242,7 @@ const aUI = {
                     $('#aTemplate_AdventureSelect').val(content.name);
                     $("#adventureIcon").html(getImage(assets.GetBuffIcon($('#aTemplate_AdventureSelect').val()).bitmapData));
                     $('#aTemplate_AdventureSelect').prop('disabled', true);
+                    $("#LHAdventureInvited").prop( "checked", content.invited );
                     aUI.modals.adventure.TM_LoadHomeTemplate(content.steps[0].file);
                     aWindow.steps = content.steps.slice(3, -1);
                     aUI.modals.adventure.TM_UpdateView();
@@ -6404,8 +6408,14 @@ const aAdventure = {
                 var id = 0;
                 adventure = adventure || aSession.adventure.name;
                 AdventureManager.getAdventures().forEach(function (adv) {
-                    if (adv.adventureName === adventure && AdventureManager.isMyAdventure(adv)) {
-                        id = adv.zoneID;
+                    if (aSession.adventure.invited) {
+                        if (adv.adventureName === adventure && !AdventureManager.isMyAdventure(adv)) {
+                            id = adv.zoneID;
+                        }
+                    } else {
+                        if (adv.adventureName === adventure && AdventureManager.isMyAdventure(adv)) {
+                            id = adv.zoneID;
+                        }
                     }
                 });
                 return id;
