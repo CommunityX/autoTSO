@@ -3063,6 +3063,8 @@ const aUI = {
                 }
                 aDebug.log('adventure', 'TM_SaveTemplate', template);
                 template.steps.push({ name: 'LoadGeneralsToEnd' });
+                if (template.invited) 
+                    template.steps.push({ name: 'ReturnHome' });
                 template.hash = hash(JSON.stringify(template));
                 var id = aWindow.adventureIndex ?
                     aSettings.defaults.Adventures.templates[aWindow.adventureIndex].id : new Date().getTime();
@@ -6271,8 +6273,8 @@ const aAdventure = {
                     }
                 });
                 var message = null;
-                if (attackerState.busy.total) {
-                    aDebug.log('adventure', 'attemptMove: Waiting for', attackerState.busy.total, 'generals');
+                if (allState.busy.total) {
+                    aDebug.log('adventure', 'attemptMove: Waiting for', allState.busy.total, 'generals');
                     message = "Waiting for Generals ({0}/{1}){2}!!".format(
                         allState.total - allState.busy.total,
                         allState.total,
@@ -7083,7 +7085,7 @@ const aAdventure = {
                 aUI.Alert('Auto Adventure Completed!', 'ARMY');
                 aUI.modals.adventure.AM_LoadInfo();
             } else if (aSession.adventure.index < aSession.adventure.steps.length) {
-                if (aAdventure.info.isOnAdventure() && aAdventure.info.getFinishedQuests(true))
+                if (aAdventure.info.isOnAdventure() && aAdventure.info.getFinishedQuests(true) && !aSession.adventure.invited)
                     aQueue.add("finishAdventureQuests");
                 var result = aAdventure.auto.execStep.current();
                 if (result) {
@@ -7423,6 +7425,96 @@ const aAdventure = {
                     return aAdventure.auto.result("Error in UnloadGenerals, skipping", true);
                 }
             },
+            RetranchAllGenerals: function () {
+                try {
+                    aDebug.log('adventure', 'RetranchAllGenerals: Starting step');
+
+                    if (!aAdventure.info.isOnAdventure()) {
+                        aDebug.log('adventure', 'RetranchAllGenerals: Not on adventure island');
+                        return aAdventure.auto.result("You must be on adventure island!");
+                    }
+
+                    // Get ALL specialists currently on adventure
+                    var allSpecialists = [];
+                    var arrivedSpecialists = [];
+                    var travelingSpecialists = [];
+
+                    try {
+                        game.getSpecialists().forEach(function (spec) {
+                            try {
+                                if (spec && spec.getPlayerID() === game.player.GetPlayerId()) {
+                                    var id = spec.GetUniqueID().toKeyString();
+                                    allSpecialists.push(id);
+
+                                    // Check if this specialist is still traveling
+                                    var isTraveling = spec.GetTask() !== null;
+
+                                    if (isTraveling) {
+                                        travelingSpecialists.push(id);
+                                    } else {
+                                        arrivedSpecialists.push(id);
+                                    }
+
+                                    try {
+                                        var specName = spec.getName ? spec.getName(false) : 'ID:' + spec.GetType();
+                                        var status = isTraveling ? 'traveling' : 'arrived';
+                                        aDebug.log('adventure', 'RetranchAllGenerals: Found specialist:', specName, '-', status);
+                                    } catch (nameError) {
+                                        aDebug.log('adventure', 'RetranchAllGenerals: Found specialist ID:', id);
+                                    }
+                                }
+                            } catch (specError) {
+                                aDebug.error('adventure', 'RetranchAllGenerals: Error checking specialist:', specError.message || specError.toString());
+                            }
+                        });
+                    } catch (e) {
+                        aDebug.error('adventure', 'RetranchAllGenerals: Error collecting specialists:', e.message || e.toString());
+                        if (e.stack) aDebug.error('adventure', 'RetranchAllGenerals: Stack:', e.stack);
+                    }
+
+                    if (!aSession.adventure.action) {
+                        aSession.adventure.action = "retranch";
+                        aDebug.log('adventure', 'RetranchAllGenerals: Initializing action state to RETRANCH');
+                    }
+
+                    if (aSession.adventure.action === "retranch") {
+
+                        // All are on zone, but some still traveling
+                        if (travelingSpecialists.length > 0) {
+                            aSession.adventure.unloadGenerals.allArrivedTime = null;
+                            aDebug.log('adventure', 'RetranchAllGenerals: Waiting for specialists to finish traveling');
+                            return aAdventure.auto.result("Waiting for specialists to arrive ({0}/{1})".format(arrivedSpecialists.length, allSpecialists.length), false, 2);
+                        }
+
+                        $.each(allSpecialists, function (index, id) {
+                            // var garrisonIdx = general.spec.GetGarrisonGridIdx();
+                            // aDebug.log('adventure', 'retranch: Checking general for retrench - garrisonIdx:', garrisonIdx);
+                            // if (!garrisonIdx) {
+                             // aDebug.log('adventure', 'retranch: Skipping general - no garrisonIdx');
+                               // return;
+                            //}
+                            //aDebug.log('adventure', 'retranch: Retrenching general with garrisonIdx:', garrisonIdx);
+                            aQueue.add('retranchGeneral', { id: id, order: "({0}/{1})".format(index + 1, allSpecialists.length) });
+                        });
+                        aDebug.log('adventure', 'AdventureTemplate: MOVE complete, transitioning to LOAD');
+                        aSession.adventure.action = 'wait';
+                        return aAdventure.auto.result("Waiting for specialists retranch", false, 2);
+                    }
+
+                    if (aSession.adventure.action === "wait") {
+                        if (travelingSpecialists.length > 0) {
+                            return aAdventure.auto.result("Waiting for specialists to arrive ({0}/{1})".format(travelingSpecialists.length, allSpecialists.length), false, 2);
+                        }                        
+                    }
+                    aSession.adventure.action = '';
+                    return aAdventure.auto.result("All generals retranched", true, 2);
+
+                } catch (er) {
+                    aDebug.error('adventure', 'RetranchAllGenerals: Fatal error:', er);
+                    if (er.stack) aDebug.error('adventure', 'RetranchAllGenerals: Stack:', er.stack);
+                    return aAdventure.auto.result("Error in RetranchAllGenerals, skipping", true);
+                } 
+            },
             WaitForDeparture: function () {
                 try {
                     aDebug.log('adventure', 'WaitForDeparture: Starting step');
@@ -7456,6 +7548,18 @@ const aAdventure = {
                     // Wait complete - reset timer and inject UnloadGenerals step
                     aSession.adventure.departureWaitStartTime = null;
                     aDebug.log('adventure', 'WaitForDeparture: Wait complete, injecting UnloadGenerals step');
+
+                    // Inject RetranchAllGenerals step after this one
+                    var nextStepIndex = aSession.adventure.index + 1;
+                    var nextStep = aSession.adventure.steps[nextStepIndex];
+
+                    if (!nextStep || nextStep.name !== 'RetranchAllGenerals') {
+                        aSession.adventure.steps.splice(nextStepIndex, 0, {
+                            name: 'RetranchAllGenerals',
+                            data: null
+                        });
+                        console.info('WaitForDeparture: Injected RetranchAllGenerals step');
+                    }
 
                     // Inject UnloadGenerals step after this one
                     var nextStepIndex = aSession.adventure.index + 1;
@@ -7808,6 +7912,7 @@ const aAdventure = {
                     aDebug.log('adventure', 'LoadGeneralsToEnd: Free units count:', freeUnits.length);
 
                     if (!freeUnits.length) {
+                        menuZoneRefreshHandler()
                         aDebug.log('adventure', 'LoadGeneralsToEnd: No free units, ready to finish adventure');
                         return aAdventure.auto.result("No unassigned units, ready to finish", true);
                     }
