@@ -7138,7 +7138,7 @@ const aAdventure = {
         invitePlayer: function (name) {
             globalFlash.gui.mFriendsList.GetFilteredFriends(name, true).forEach(function(item){
                 aDebug.log('adventure', 'invitePlayer', item);
-                globalFlash.gui.mAdventurePanel.Show()
+                //globalFlash.gui.mAdventurePanel.Show();
                 globalFlash.gui.mAdventurePanel.AddInvitedPlayer(item);
             });
         }
@@ -7670,7 +7670,7 @@ const aAdventure = {
             },
             InvitePlayerToAdventure: function () {
                 try {
-                    aDebug.log('adventure', 'InvitePlayerToAdventure: Starting step');
+                    aDebug.log('adventure', 'InvitePlayerToAdventure: Starting step current action', aSession.adventure.action);
 
                     var adventureID = aAdventure.info.getActiveAdvetureID();
                     if (!adventureID) {
@@ -7686,41 +7686,41 @@ const aAdventure = {
                     }
 
                     if (aSession.adventure.action === 'Invite') {
-                        adv = aAdventure.info.getHostedAdventure()
-                        advPlayers = []
+                        aDebug.log('adventure', 'InvitePlayerToAdventure: Starting Invite action');
+                        adv = aAdventure.info.getHostedAdventure();
+                        advPlayers = [];
 
                         $.each(adv.players, function (index, player) {
                             advPlayers.push(player.username)
-                        })
+                        });
 
-                        aDebug.log('adventure', 'InvitePlayerToAdventure: player in the adventure already ', advPlayers);
-                        aDebug.log('adventure', 'InvitePlayerToAdventure: player to invite ', step.invite_player);
-
-                        $.each(step.invite_player, function (index, player) {
-                            if (!advPlayers.indexOf(player)) {
+                        step.invite_player.forEach(function (player) {
+                            if (advPlayers.indexOf(player) === -1) {
                                 aDebug.log('adventure', 'InvitePlayerToAdventure: Inviting player ', player);
-                                aAdventure.action.invitePlayer(player)
+                                aAdventure.action.invitePlayer(player);
                             }
-                        })
+                        });
                         aSession.adventure.action = "Check";
                         return aAdventure.auto.result("Invite done next step Check", false, 2);
                     }
 
                     if (aSession.adventure.action === 'Check') {
-                        adv = aAdventure.info.getHostedAdventure()
-                        advPlayers = []
+                        aDebug.log('adventure', 'InvitePlayerToAdventure: Starting Check action');
+
+                        adv = aAdventure.info.getHostedAdventure();
+                        advPlayers = [];
 
                         $.each(adv.players, function (index, player) {
-                            advPlayers.push(player.username)
-                        })
+                            advPlayers.push(player.username);
+                        });
 
-                        $.each(step.invite_player, function (index, player) {
-                            if (!advPlayers.indexOf(player)) {
+                        step.invite_player.forEach(function (player) {
+                            if (advPlayers.indexOf(player) === -1) {
                                 aDebug.log('adventure', 'InvitePlayerToAdventure: Missing invited player ', player, ' retrying invite');
                                 aSession.adventure.action = "Invite";
                                 return aAdventure.auto.result("Missing player retrying", false, 2);
                             }
-                        })
+                        });
                         aSession.adventure.action = "";
                     }
 
