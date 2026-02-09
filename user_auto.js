@@ -6792,6 +6792,7 @@ const aAdventure = {
 
                     if (general.GetGeneralState() == 2) {
                         aDebug.log('adventure', 'assignAllUnitsToFinish: Skipping general', generalName, '- dead');
+                        return;
                     }
 
                     if (remainingCapacity === 0) {
