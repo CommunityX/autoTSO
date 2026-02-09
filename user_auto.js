@@ -485,6 +485,8 @@ const aSession = {
             allArrivedTime: null    // Timestamp when all specialists arrived on adventure
         },
         steps: [],
+        invited: false,
+        player_invite: [],
         getGenerals: function (current) {
             const step = aSession.adventure.steps[current ? aSession.adventure.index : 0];
             if (!current && step.name !== 'InHomeLoadGenerals') return [];
@@ -2934,6 +2936,22 @@ const aUI = {
                             ])
                         );
                         break;
+                    case 'InvitePlayerToAdventure':
+                        $.each(step.invite_player, function (index, player) {
+                            selectedStep.append(
+                                aUtils.create.Row([
+                                    [2, 'Invite Player:'],
+                                    [7, aUtils.create.Span("selectedStep_InvitePlayer"+index, player)],
+                                    [2, aUtils.create.Button("", "Change").click(function () {
+                                        var playerName = prompt("Player name to invite")
+                                        if (!playerName) return;
+                                        step.invite_player[index] = playerName;
+                                        $("#selectedStep_InvitePlayer"+index).text(step.invite_player[index])
+                                    })]
+                                ])
+                            );
+                        });
+                        break;
                     case 'ProduceItem':
                     case 'ApplyBuff':
                         const item = aAdventure.data.getItems($("#aTemplate_AdventureSelect").val())[step.data];
@@ -3197,6 +3215,7 @@ const aUI = {
                             $('<li>').html($('<a>', { 'href': '#', 'name': 'ReturnHome', 'class': 'venture_only' }).text("Return Home")),
                             $('<li>').html($('<a>', { 'href': '#', 'name': 'VisitAdventure' }).text("Load Adventure")),
                             $('<li>').html($('<a>', { 'href': '#', 'name': 'CollectPickups', 'class': 'venture_only' }).text("Collect Pickups")),
+                            $('<li>').html($('<a>', { 'href': '#', 'name': 'InvitePlayerToAdventure' }).text("Invite Player/s")),
                             $('<li>').html($('<a>', { 'href': '#', 'name': 'AdventureTemplate' }).text("Adventure Template/s")),
                             $('<li>').html($('<a>', { 'href': '#', 'name': 'UnloadGenerals' }).text("Unload General/s")),
                             $('<li>').html($('<a>', { 'href': '#', 'name': 'SendHome' }).text("Send General/s Home")),
@@ -3235,6 +3254,18 @@ const aUI = {
                             aUI.modals.adventure.TM_UpdateView();
                         };
                         root.addEventListener(window.runtime.flash.events.FileListEvent.SELECT_MULTIPLE, selectHandler);
+                    } else if (this.name === 'InvitePlayerToAdventure') {
+                        var maxPlayer = aAdventure.data.getAdventureMaxPlayers($("#aTemplate_AdventureSelect").val())
+                        if (maxPlayer == 1) {
+                            return alert("This adventure have no room for more player!");
+                        }
+                        var invite_player = []
+                        for (var i = 1; i < maxPlayer; i++) {
+                            var playerName = prompt("Player name to invite")
+                            invite_player.push(playerName)
+                        }
+                        aWindow.steps.push({ name: 'InvitePlayerToAdventure', invite_player: invite_player });
+                        aUI.modals.adventure.TM_UpdateView();
                     } else {
                         const isNotVenture = aAdventure.data.getAdventureType($("#aTemplate_AdventureSelect").val()) !== "Venture";
                         if (this.name === 'CollectPickups' && isNotVenture)
@@ -6737,6 +6768,9 @@ const aAdventure = {
         getAdventureType: function (name) {
             return game.def('AdventureSystem::cAdventureDefinition').FindAdventureDefinition(name).GetType_string();
         },
+        getAdventureMaxPlayers: function (name) {
+            return game.def('AdventureSystem::cAdventureDefinition').FindAdventureDefinition(name).mMaxPlayers;
+        },
         getItems: function (adventure) {
             const name = adventure || aSession.adventure.name;
             return game.auto.resources.AdventureItems[name.replace('BuffAdventures_', '')];
@@ -7079,6 +7113,12 @@ const aAdventure = {
             aQueue.addToWaiting('status', ['Training Lost Units!', 'Adventure'], TIMEOUTS.ADVENTURE_RETRY_DELAY);
             $.each(lostArmy.army, function (unitName, unitsNeeded) {
                 aQueue.addToWaiting('startProduction', [unitName, unitsNeeded, false]);
+            });
+        },
+        invitePlayer: function (name) {
+            globalFlash.gui.mFriendsList.GetFilteredFriends(name, true).forEach(function(item){
+                aDebug.log('adventure', 'invitePlayer', item);
+                globalFlash.gui.mAdventurePanel.AddInvitedPlayer(item);
             });
         }
     },
@@ -7608,6 +7648,30 @@ const aAdventure = {
                     aDebug.error('adventure', 'WaitForDeparture: Fatal error:', er);
                     if (er.stack) aDebug.error('adventure', 'WaitForDeparture: Stack:', er.stack);
                     return aAdventure.auto.result("Error in WaitForDeparture, skipping", true);
+                }
+            },
+            InvitePlayerToAdventure: function () {
+                try {
+                    aDebug.log('adventure', 'InvitePlayerToAdventure: Starting step');
+
+                    var adventureID = aAdventure.info.getActiveAdvetureID();
+                    if (!adventureID) {
+                        aDebug.log('adventure', 'InvitePlayerToAdventure: No active adventure found');
+                        return aAdventure.auto.result("Can't find ({0}) in active adventures".format(loca.GetText('ADN', this.data.name)), false, 10);
+                    }
+
+                    const step = aSession.adventure.currentStep();
+
+                    $.each(step.invite_player, function (index, player) {
+                        aDebug.log('adventure', 'InvitePlayerToAdventure: Inviting player ', player);
+                        aAdventure.action.invitePlayer(player)
+                    })
+
+                    return aAdventure.auto.result("Inviting Player complete", true, 2);
+
+                } catch (er) {
+                    aDebug.error('adventure', 'InvitePlayerToAdventure: Error:', er);
+                    console.error(er);
                 }
             },
             VisitAdventure: function () {
