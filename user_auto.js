@@ -537,6 +537,14 @@ const aSession = {
             });
             return result;
         },
+        hasStep: function (stepName) {
+            var result = false;
+            $.each(aSession.adventure.steps, function (index, step) {
+                if (step.name === stepName)
+                    result = true;
+            });
+            return result;
+        },
         currentStep: function () {
             try {
                 return aSession.adventure.steps[aSession.adventure.index];
@@ -1722,7 +1730,8 @@ const aUtils = {
                         var nextStep = aSession.adventure.steps[nextStepIndex];
 
                         // If next step is not WaitForDeparture, inject it
-                        if (!nextStep || nextStep.name !== 'WaitForDeparture') {
+
+                        if (!aSession.adventure.hasStep('WaitForDeparture')) {
                             aDebug.log('adventure', 'zoneRefreshed: Auto-injecting WaitForDeparture step at index', nextStepIndex);
                             aSession.adventure.steps.splice(nextStepIndex, 0, {
                                 name: 'WaitForDeparture',
@@ -6466,7 +6475,18 @@ const aAdventure = {
                 return id;
             } catch (er) { return 0; }
         },
-
+        getHostedAdventure: function (adventure) {
+            try {
+                var result = null;
+                adventure = adventure || aSession.adventure.name;
+                AdventureManager.getAdventures().forEach(function (adv) {
+                    if (adv.adventureName === adventure && AdventureManager.isMyAdventure(adv)) {
+                        result = adv;
+                    }
+                });
+                return result;
+            } catch (er) { return 0; }
+        },
         /**
          * Checks if any generals in the list are currently busy
          * @param {Array|Object} generals - List of general IDs or general data object
@@ -7621,9 +7641,8 @@ const aAdventure = {
 
                     // Inject RetranchAllGenerals step after this one
                     var nextStepIndex = aSession.adventure.index + 1;
-                    var nextStep = aSession.adventure.steps[nextStepIndex];
 
-                    if (!nextStep || nextStep.name !== 'RetranchAllGenerals') {
+                    if (!aSession.adventure.hasStep('RetranchAllGenerals')) {
                         aSession.adventure.steps.splice(nextStepIndex, 0, {
                             name: 'RetranchAllGenerals',
                             data: null
@@ -7632,10 +7651,8 @@ const aAdventure = {
                     }
 
                     // Inject UnloadGenerals step after this one
-                    var nextStepIndex = aSession.adventure.index + 1;
-                    var nextStep = aSession.adventure.steps[nextStepIndex];
 
-                    if (!nextStep || nextStep.name !== 'UnloadGenerals') {
+                    if (!aSession.adventure.hasStep('UnloadGenerals')) {
                         aSession.adventure.steps.splice(nextStepIndex, 0, {
                             name: 'UnloadGenerals',
                             data: null
@@ -7662,10 +7679,30 @@ const aAdventure = {
 
                     const step = aSession.adventure.currentStep();
 
-                    $.each(step.invite_player, function (index, player) {
-                        aDebug.log('adventure', 'InvitePlayerToAdventure: Inviting player ', player);
-                        aAdventure.action.invitePlayer(player)
-                    })
+                    if (!aSession.adventure.action) {
+                        aSession.adventure.action = "Invite";
+                        aDebug.log('adventure', 'InvitePlayerToAdventure: Initializing action state to Invite');
+                    }
+
+                    if (aSession.adventure.action === 'Invite') {
+                         menuZoneRefreshHandler()
+                        $.each(step.invite_player, function (index, player) {
+                            aDebug.log('adventure', 'InvitePlayerToAdventure: Inviting player ', player);
+                            aAdventure.action.invitePlayer(player)
+                        })
+                        aSession.adventure.action = "Check";
+                    }
+
+                    if (aSession.adventure.action === 'Check') {
+                         menuZoneRefreshHandler()
+                        $.each(step.invite_player, function (index, player) {
+                            aDebug.log('adventure', 'InvitePlayerToAdventure: Inviting player ', player);
+                            aAdventure.action.invitePlayer(player)
+                        })
+                        aSession.adventure.action = "Check";
+                    }
+                    adv = aAdventure.info.getHostedAdventure()
+                    
 
                     return aAdventure.auto.result("Inviting Player complete", true, 2);
 
