@@ -6844,8 +6844,8 @@ const aAdventure = {
                     aDebug.log('adventure', 'assignAllUnitsToFinish: Processing general:', generalName,
                         ', hasElite:', hasEliteUnits, ', capacity:', remainingCapacity);
 
-                    if (general.GetGeneralState() == 2) {
-                        aDebug.log('adventure', 'assignAllUnitsToFinish: Skipping general', generalName, '- dead');
+                    if (general.GetGeneralState() != 0) {
+                        aDebug.log('adventure', 'assignAllUnitsToFinish: Skipping general', generalName, '- not idle');
                         return;
                     }
 
@@ -7686,24 +7686,43 @@ const aAdventure = {
                     }
 
                     if (aSession.adventure.action === 'Invite') {
-                         menuZoneRefreshHandler()
+                        menuZoneRefreshHandler()
+
+                        adv = aAdventure.info.getHostedAdventure()
+                        advPlayers = []
+
+                        $.each(adv.players, function (index, player) {
+                            advPlayers.push(player.username)
+                        })
+
                         $.each(step.invite_player, function (index, player) {
-                            aDebug.log('adventure', 'InvitePlayerToAdventure: Inviting player ', player);
-                            aAdventure.action.invitePlayer(player)
+                            if (!advPlayers.indexOf(player)) {
+                                aDebug.log('adventure', 'InvitePlayerToAdventure: Inviting player ', player);
+                                aAdventure.action.invitePlayer(player)
+                            }
                         })
                         aSession.adventure.action = "Check";
+                        return aAdventure.auto.result("Invite done next step Check", false, 2);
                     }
 
                     if (aSession.adventure.action === 'Check') {
-                         menuZoneRefreshHandler()
-                        $.each(step.invite_player, function (index, player) {
-                            aDebug.log('adventure', 'InvitePlayerToAdventure: Inviting player ', player);
-                            aAdventure.action.invitePlayer(player)
+                        menuZoneRefreshHandler()
+                        adv = aAdventure.info.getHostedAdventure()
+                        advPlayers = []
+
+                        $.each(adv.players, function (index, player) {
+                            advPlayers.push(player.username)
                         })
-                        aSession.adventure.action = "Check";
+
+                        $.each(step.invite_player, function (index, player) {
+                            if (!advPlayers.indexOf(player)) {
+                                aDebug.log('adventure', 'InvitePlayerToAdventure: Missing invited player ', player, ' retrying invite');
+                                aSession.adventure.action = "Invite";
+                                return aAdventure.auto.result("Missing player retrying", false, 2);
+                            }
+                        })
+                        aSession.adventure.action = "";
                     }
-                    adv = aAdventure.info.getHostedAdventure()
-                    
 
                     return aAdventure.auto.result("Inviting Player complete", true, 2);
 
