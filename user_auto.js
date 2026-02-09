@@ -7138,6 +7138,7 @@ const aAdventure = {
         invitePlayer: function (name) {
             globalFlash.gui.mFriendsList.GetFilteredFriends(name, true).forEach(function(item){
                 aDebug.log('adventure', 'invitePlayer', item);
+                globalFlash.gui.mAdventurePanel.Show()
                 globalFlash.gui.mAdventurePanel.AddInvitedPlayer(item);
             });
         }
