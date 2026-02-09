@@ -7686,14 +7686,15 @@ const aAdventure = {
                     }
 
                     if (aSession.adventure.action === 'Invite') {
-                        menuZoneRefreshHandler()
-
                         adv = aAdventure.info.getHostedAdventure()
                         advPlayers = []
 
                         $.each(adv.players, function (index, player) {
                             advPlayers.push(player.username)
                         })
+
+                        aDebug.log('adventure', 'InvitePlayerToAdventure: player in the adventure already ', advPlayers);
+                        aDebug.log('adventure', 'InvitePlayerToAdventure: player to invite ', step.invite_player);
 
                         $.each(step.invite_player, function (index, player) {
                             if (!advPlayers.indexOf(player)) {
@@ -7706,7 +7707,6 @@ const aAdventure = {
                     }
 
                     if (aSession.adventure.action === 'Check') {
-                        menuZoneRefreshHandler()
                         adv = aAdventure.info.getHostedAdventure()
                         advPlayers = []
 
