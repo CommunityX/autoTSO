@@ -2164,7 +2164,7 @@ const aUI = {
                 template.label || loca.GetText('ADN', template.name),
                 amount
             );
-            return { label: label, enabled: (amount || aAdventure.info.getActiveAdvetureID(template.name)) ? true : false, name: name, onSelect: aUI.menu.startAutoAdventure };
+            return { label: label, enabled: (amount || aAdventure.info.getActiveAdvetureID(template.name) || template.invited) ? true : false, name: name, onSelect: aUI.menu.startAutoAdventure };
         },
         featureLabel: function (feature) {
             const name = feature.replace(/_/g, "");
@@ -2189,8 +2189,14 @@ const aUI = {
                     aUtils.file.Read(aUtils.file.getPath(0, event.target.name));
 
                 const AdventureActive = aAdventure.info.getActiveAdvetureID(adventure.name) ? 1 : 0;
-                const mapCount = aBuffs.getBuffAmount(['Adventure', adventure.name]) + AdventureActive;
-                if (mapCount < 1)
+                if (adventure.invited) {
+                    aDebug.log('adventure', 'startAutoAdventure', 'invited mode set mapCount to 99');
+                    const mapCount = 99
+                } else {
+                    const mapCount = aBuffs.getBuffAmount(['Adventure', adventure.name]) + AdventureActive;
+                }
+
+                if (!adventure.invited && mapCount < 1)
                     return aUI.Alert("You don't have any adventure maps for this adventure!", "ERROR");
 
                 var repeat = confirm("Repeat the adventure as many as you have? x{0}".format(mapCount));
@@ -3076,8 +3082,11 @@ const aUI = {
                     aSettings.defaults.Adventures.templates.push({
                         label: prompt("Custom adventure name"),
                         name: template.name,
-                        id: id
+                        id: id,
+                        invited: template.invited
                     });
+                } else {
+                    aSettings.defaults.Adventures.templates[aWindow.adventureIndex].invited = template.invited
                 }
                 aSettings.save(true);
                 if (!aWindow.adventureIndex)
@@ -3246,7 +3255,10 @@ const aUI = {
                     $('#aTemplate_AdventureSelect').prop('disabled', true);
                     $("#LHAdventureInvited").prop( "checked", content.invited );
                     aUI.modals.adventure.TM_LoadHomeTemplate(content.steps[0].file);
-                    aWindow.steps = content.steps.slice(3, -1);
+                    if (content.invited)
+                        aWindow.steps = content.steps.slice(3, -2);
+                    else
+                        aWindow.steps = content.steps.slice(3, -1);
                     aUI.modals.adventure.TM_UpdateView();
                 } else {
                     $('#aTemplate_AdventureSelect').change();
@@ -7085,8 +7097,6 @@ const aAdventure = {
                 aUI.Alert('Auto Adventure Completed!', 'ARMY');
                 aUI.modals.adventure.AM_LoadInfo();
             } else if (aSession.adventure.index < aSession.adventure.steps.length) {
-                if (aAdventure.info.isOnAdventure() && aAdventure.info.getFinishedQuests(true) && !aSession.adventure.invited)
-                    aQueue.add("finishAdventureQuests");
                 var result = aAdventure.auto.execStep.current();
                 if (result) {
                     if (result.next) { aSession.adventure.nextStep(); }
@@ -7094,6 +7104,9 @@ const aAdventure = {
                     if (result.interval) { aQueue.interval = result.interval; }
                     aSettings.save();
                 }
+            //} else if (aSession.adventure.index = aSession.adventure.steps.length) {
+            //    if (aAdventure.info.isOnAdventure() && aAdventure.info.getFinishedQuests(true) && !aSession.adventure.invited)
+            //        aQueue.add("finishAdventureQuests");
             } else {
                 aAdventure.army.updateArmy();
                 if (!Object.keys(armyInfo.free).length)
@@ -7159,10 +7172,21 @@ const aAdventure = {
                         return aAdventure.auto.result('"{0}" is active'.format(loca.GetText('ADN', aSession.adventure.name)), true, 3);
                     } else if (aSession.adventure.action.indexOf('WaitingAdventure') === 0) {
                         var num = parseInt(aSession.adventure.action.split('_')[1]);
-                        var nextAction = num > 2 ? '' : 'WaitingAdventure_' + (num + 1);
-                        aDebug.log('adventure', 'StartAdventure: Wait state - attempt', num, ', next:', nextAction);
-                        aSession.adventure.action = nextAction;
-                        return aAdventure.auto.result('Waiting for "{0}" to start'.format(loca.GetText('ADN', aSession.adventure.name)));
+                        if (aSession.adventure.invited) {
+                            var nextAction = aSession.adventure.action;
+                            aDebug.log('adventure', 'StartAdventure: Wait for invite , next:', nextAction);
+                            aSession.adventure.action = nextAction;
+                            return aAdventure.auto.result('Waiting for invite to "{0}" '.format(loca.GetText('ADN', aSession.adventure.name)));
+                        } else {
+                            var nextAction = num > 2 ? '' : 'WaitingAdventure_' + (num + 1);
+                            aDebug.log('adventure', 'StartAdventure: Wait state - attempt', num, ', next:', nextAction);
+                            aSession.adventure.action = nextAction;
+                            return aAdventure.auto.result('Waiting for "{0}" to start'.format(loca.GetText('ADN', aSession.adventure.name)));
+                        }
+                    } else if (aSession.adventure.invited) {
+                        aDebug.log('adventure', 'StartAdventure: Waiting for adventure invite');
+                        aSession.adventure.action = 'WaitingAdventure_1';
+                        return aAdventure.auto.result();
                     } else {
                         var hasMap = aBuffs.getBuffAmount(['Adventure', aSession.adventure.name]);
                         aDebug.log('adventure', 'StartAdventure: Adventure map check - has map:', hasMap);
