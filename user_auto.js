@@ -6781,6 +6781,10 @@ const aAdventure = {
                 aDebug.log('adventure', 'assignAllUnitsToFinish: Found', generals.length, 'generals');
 
                 generals.forEach(function (general) {
+
+                    aDebug.log('adventure', 'assignAllUnitsToFinish: Processing general:', general.canSubmitMove);
+                    aDebug.log('adventure', 'assignAllUnitsToFinish: Processing general:', JSON.stringify(general));
+                    
                     var generalName = general.GetName ? general.GetName() : 'Unknown';
                     var generalArmy = general.GetArmy();
                     var hasEliteUnits = generalArmy.HasEliteUnits();
@@ -7921,14 +7925,6 @@ const aAdventure = {
                         return aAdventure.auto.result("You must be on adventure island to load all units");
                     }
 
-                    var enemies = aSession.adventure.getEnemies();
-                    aDebug.log('adventure', 'LoadGeneralsToEnd: Remaining enemies:', enemies.remaining);
-
-                    if (enemies.remaining > 0) {
-                        aDebug.log('adventure', 'LoadGeneralsToEnd: Still fighting, waiting for enemies to be killed');
-                        return aAdventure.auto.result("Waiting to kill enemies!!");
-                    }
-
                     aDebug.log('adventure', 'LoadGeneralsToEnd: Updating army info');
                     aAdventure.army.updateArmy();
 
@@ -7938,6 +7934,15 @@ const aAdventure = {
                     if (!freeUnits.length) {
                         menuZoneRefreshHandler()
                         aDebug.log('adventure', 'LoadGeneralsToEnd: No free units, ready to finish adventure');
+
+                        var enemies = aSession.adventure.getEnemies();
+                        aDebug.log('adventure', 'LoadGeneralsToEnd: Remaining enemies:', enemies.remaining);
+
+                        if (enemies.remaining > 0) {
+                            aDebug.log('adventure', 'LoadGeneralsToEnd: Still fighting, waiting for enemies to be killed');
+                            return aAdventure.auto.result("Waiting to kill enemies!!");
+                        }
+
                         return aAdventure.auto.result("No unassigned units, ready to finish", true);
                     }
 
