@@ -6782,9 +6782,6 @@ const aAdventure = {
 
                 generals.forEach(function (general) {
 
-                    aDebug.log('adventure', 'assignAllUnitsToFinish: Processing general:', general.canSubmitMove);
-                    aDebug.log('adventure', 'assignAllUnitsToFinish: Processing general:', JSON.stringify(general));
-                    
                     var generalName = general.GetName ? general.GetName() : 'Unknown';
                     var generalArmy = general.GetArmy();
                     var hasEliteUnits = generalArmy.HasEliteUnits();
@@ -6792,6 +6789,10 @@ const aAdventure = {
 
                     aDebug.log('adventure', 'assignAllUnitsToFinish: Processing general:', generalName,
                         ', hasElite:', hasEliteUnits, ', capacity:', remainingCapacity);
+
+                    if (general.GetGeneralState() == 2) {
+                        aDebug.log('adventure', 'assignAllUnitsToFinish: Skipping general', generalName, '- dead');
+                    }
 
                     if (remainingCapacity === 0) {
                         aDebug.log('adventure', 'assignAllUnitsToFinish: Skipping general', generalName, '- no capacity');
