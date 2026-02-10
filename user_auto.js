@@ -537,6 +537,15 @@ const aSession = {
             });
             return result;
         },
+        getStepIndex: function (stepName) {
+            var result = 0;
+            $.each(aSession.adventure.steps, function (index, step) {
+                if (step.name === stepName)
+                    result = index;
+                    return
+            });
+            return result;
+        },
         hasStep: function (stepName) {
             var result = false;
             $.each(aSession.adventure.steps, function (index, step) {
@@ -7136,11 +7145,20 @@ const aAdventure = {
             });
         },
         invitePlayer: function (name) {
-            globalFlash.gui.mFriendsList.GetFilteredFriends(name, true).forEach(function(item){
-                aDebug.log('adventure', 'invitePlayer', item);
-                //globalFlash.gui.mAdventurePanel.Show();
-                globalFlash.gui.mAdventurePanel.AddInvitedPlayer(item);
-            });
+            var adventureID = aAdventure.info.getActiveAdvetureID();
+            if (adventureID) {
+                globalFlash.gui.mFriendsList.GetFilteredFriends(name, true).forEach(function(item){
+                    aDebug.log('adventure', 'invitePlayer', item);
+                    var dIntegerVO = swmmo.getDefinitionByName("Communication.VO.dIntegerVO");
+                    var vo = new dIntegerVO();
+                    vo.value = item.id
+
+                    game.gi.mClientMessages.SendMessagetoServer(92, -11546980, vo);
+
+                });
+            } else {
+                aDebug.log('adventure', 'action - invitePlayer invalid adventureID', adventureID);
+            }
         }
     },
 
@@ -7640,11 +7658,13 @@ const aAdventure = {
                     aSession.adventure.departureWaitStartTime = null;
                     aDebug.log('adventure', 'WaitForDeparture: Wait complete, injecting UnloadGenerals step');
 
+
+                    const index = aSession.adventure.getStepIndex('UseSpeedBuff')
                     // Inject RetranchAllGenerals step after this one
-                    var nextStepIndex = aSession.adventure.index + 1;
+                    //var nextStepIndex = aSession.adventure.index + 1;
 
                     if (!aSession.adventure.hasStep('RetranchAllGenerals')) {
-                        aSession.adventure.steps.splice(nextStepIndex, 0, {
+                        aSession.adventure.steps.splice(index, 0, {
                             name: 'RetranchAllGenerals',
                             data: null
                         });
@@ -7654,7 +7674,7 @@ const aAdventure = {
                     // Inject UnloadGenerals step after this one
 
                     if (!aSession.adventure.hasStep('UnloadGenerals')) {
-                        aSession.adventure.steps.splice(nextStepIndex, 0, {
+                        aSession.adventure.steps.splice(index, 0, {
                             name: 'UnloadGenerals',
                             data: null
                         });
@@ -7682,6 +7702,7 @@ const aAdventure = {
 
                     if (!aSession.adventure.action) {
                         aSession.adventure.action = "Invite";
+                        //menuZoneRefreshHandler()
                         aDebug.log('adventure', 'InvitePlayerToAdventure: Initializing action state to Invite');
                     }
 
@@ -7714,13 +7735,19 @@ const aAdventure = {
                             advPlayers.push(player.username);
                         });
 
+                        missing = false
+
                         step.invite_player.forEach(function (player) {
                             if (advPlayers.indexOf(player) === -1) {
                                 aDebug.log('adventure', 'InvitePlayerToAdventure: Missing invited player ', player, ' retrying invite');
-                                aSession.adventure.action = "Invite";
-                                return aAdventure.auto.result("Missing player retrying", false, 2);
+                                missing = true
                             }
                         });
+                        if (missing) {
+                            aSession.adventure.action = "Invite";
+                            return aAdventure.auto.result("Missing player retrying", false, 2);
+                        }
+
                         aSession.adventure.action = "";
                     }
 
