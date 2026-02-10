@@ -989,6 +989,18 @@ const aQueue = {
                 });
             } catch (er) { }
         },
+        finishAdventureInvited: function () {
+            try {
+                aDebug.log('adventure', 'finishAdventureInvited: ');
+
+                //AdventureManager.removeAdventure(aAdventure.info.getActiveAdvetureID());
+                aSession.isOn.Adventure = false;
+                aSession.adventure.action = "FinishAdventure";
+                aSession.adventure.lastTime = new Date().getTime();
+                //game.gi.visitZone(game.gi.mCurrentPlayer.GetHomeZoneId());
+                aUI.playSound('QuestComplete');
+            } catch (er) { }
+        },
         loadGeneralUnits: function (args) {
             aDebug.log('adventure', 'loadGeneralUnits: Loading units for general');
             aDebug.log('adventure', 'loadGeneralUnits: Message:', args.message);
@@ -7153,7 +7165,7 @@ const aAdventure = {
                     var vo = new dIntegerVO();
                     vo.value = item.id
 
-                    game.gi.mClientMessages.SendMessagetoServer(92, -11546980, vo);
+                    game.gi.mClientMessages.SendMessagetoServer(92, adventureID, vo);
 
                 });
             } else {
@@ -7189,9 +7201,13 @@ const aAdventure = {
                     if (result.interval) { aQueue.interval = result.interval; }
                     aSettings.save();
                 }
-            //} else if (aSession.adventure.index = aSession.adventure.steps.length) {
-            //    if (aAdventure.info.isOnAdventure() && aAdventure.info.getFinishedQuests(true) && !aSession.adventure.invited)
-            //        aQueue.add("finishAdventureQuests");
+            } else if (aSession.adventure.index = aSession.adventure.steps.length) {
+                if (aAdventure.info.isOnAdventure() && aAdventure.info.getFinishedQuests(true)) {
+                    if (!aSession.adventure.invited)
+                        aQueue.add("finishAdventureQuests");
+                    else                
+                        aQueue.add("finishAdventureInvited");
+                }
             } else {
                 aAdventure.army.updateArmy();
                 if (!Object.keys(armyInfo.free).length)
