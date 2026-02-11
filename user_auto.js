@@ -962,6 +962,12 @@ const aQueue = {
         },
         finishAdventureQuests: function () {
             try {
+
+                if (!aAdventure.info.isOnAdventure()) {
+                    aDebug.log('adventure', 'finishAdventureQuests: Not on adventure island');
+                    return;
+                }
+
                 aDebug.log('adventure', 'finishAdventureQuests: Checking for finished quests');
                 var finishedQuests = game.quests.GetQuestPool().GetQuest_vector().toArray().filter(function (e) { return e && e.isFinished(); });
                 aDebug.log('adventure', 'finishAdventureQuests: Found', finishedQuests.length, 'finished quests');
@@ -993,11 +999,16 @@ const aQueue = {
             try {
                 aDebug.log('adventure', 'finishAdventureInvited: ');
 
-                //AdventureManager.removeAdventure(aAdventure.info.getActiveAdvetureID());
+                if (!aAdventure.info.isOnAdventure()) {
+                    aDebug.log('adventure', 'finishAdventureInvited: Not on adventure island');
+                    return;
+                }
+
+                AdventureManager.removeAdventure(aAdventure.info.getActiveAdvetureID());
                 aSession.isOn.Adventure = false;
                 aSession.adventure.action = "FinishAdventure";
                 aSession.adventure.lastTime = new Date().getTime();
-                //game.gi.visitZone(game.gi.mCurrentPlayer.GetHomeZoneId());
+                game.gi.visitZone(game.gi.mCurrentPlayer.GetHomeZoneId());
                 aUI.playSound('QuestComplete');
             } catch (er) { }
         },
@@ -3117,8 +3128,6 @@ const aUI = {
                 }
                 aDebug.log('adventure', 'TM_SaveTemplate', template);
                 template.steps.push({ name: 'LoadGeneralsToEnd' });
-                if (template.invited) 
-                    template.steps.push({ name: 'ReturnHome' });
                 template.hash = hash(JSON.stringify(template));
                 var id = aWindow.adventureIndex ?
                     aSettings.defaults.Adventures.templates[aWindow.adventureIndex].id : new Date().getTime();
@@ -3316,10 +3325,7 @@ const aUI = {
                     $('#aTemplate_AdventureSelect').prop('disabled', true);
                     $("#LHAdventureInvited").prop( "checked", content.invited );
                     aUI.modals.adventure.TM_LoadHomeTemplate(content.steps[0].file);
-                    if (content.invited)
-                        aWindow.steps = content.steps.slice(3, -2);
-                    else
-                        aWindow.steps = content.steps.slice(3, -1);
+                    aWindow.steps = content.steps.slice(3, -1);
                     aUI.modals.adventure.TM_UpdateView();
                 } else {
                     $('#aTemplate_AdventureSelect').change();
